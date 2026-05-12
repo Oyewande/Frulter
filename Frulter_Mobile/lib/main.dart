@@ -6,35 +6,36 @@ void main() {
   runApp(const MyApp());
 }
 
-// ─── Config ────────────────────────────────────────────────────────────────
-// Replace this with your Railway deployment URL once deployed.
-// For local testing use:
-//   Android emulator → 'http://10.0.2.2:8000'
-//   iOS simulator / web → 'http://localhost:8000'
-const String kBaseUrl = 'https://your-app.up.railway.app';
+const String kBaseUrl = 'https://frulter.up.railway.app';
 
 // ─── Model ─────────────────────────────────────────────────────────────────
-class ProduceItem {
+class FoodItem {
   final int id;
   final String name;
   final String category;
-  final String color;
+  final String size;
+  final bool hasSeeds;
+  final bool isBerry;
   final String imageUrl;
 
-  const ProduceItem({
+  const FoodItem({
     required this.id,
     required this.name,
     required this.category,
-    required this.color,
+    required this.size,
+    required this.hasSeeds,
+    required this.isBerry,
     required this.imageUrl,
   });
 
-  factory ProduceItem.fromJson(Map<String, dynamic> json) {
-    return ProduceItem(
+  factory FoodItem.fromJson(Map<String, dynamic> json) {
+    return FoodItem(
       id: json['id'] as int,
       name: json['name'] as String,
       category: json['category'] as String,
-      color: json['color'] as String,
+      size: json['size'] as String,
+      hasSeeds: json['has_seeds'] as bool,
+      isBerry: json['is_berry'] as bool,
       imageUrl: json['image'] as String,
     );
   }
@@ -42,25 +43,28 @@ class ProduceItem {
 
 // ─── API Service ───────────────────────────────────────────────────────────
 class ProduceApi {
-  static Future<List<ProduceItem>> fetchProduce({
+  static Future<List<FoodItem>> fetchProduce({
     String? category,
-    String? color,
+    String? size,
+    bool? hasSeeds,
+    bool? isBerry,
   }) async {
     final queryParams = <String, String>{};
     if (category != null && category != 'all') queryParams['category'] = category;
-    if (color != null && color != 'all') queryParams['color'] = color;
+    if (size != null && size != 'all') queryParams['size'] = size;
+    if (hasSeeds != null) queryParams['has_seeds'] = hasSeeds.toString();
+    if (isBerry != null) queryParams['is_berry'] = isBerry.toString();
 
     final uri = Uri.parse('$kBaseUrl/produce/filter')
         .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
 
-    final response =
-        await http.get(uri).timeout(const Duration(seconds: 10));
+    final response = await http.get(uri).timeout(const Duration(seconds: 10));
 
     if (response.statusCode == 200) {
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       final items = body['data'] as List<dynamic>;
       return items
-          .map((e) => ProduceItem.fromJson(e as Map<String, dynamic>))
+          .map((e) => FoodItem.fromJson(e as Map<String, dynamic>))
           .toList();
     } else {
       throw Exception('Server error: ${response.statusCode}');
@@ -95,30 +99,14 @@ class FilterListScreen extends StatefulWidget {
 }
 
 class _FilterListScreenState extends State<FilterListScreen> {
-  List<ProduceItem> _items = [];
+  List<FoodItem> _items = [];
   bool _isLoading = true;
   String? _errorMessage;
 
   String _selectedCategory = 'all';
-  String _selectedColor = 'all';
-
-  static const List<String> _categories = ['all', 'fruit', 'vegetable'];
-  static const List<String> _colors = [
-    'all',
-    'Red',
-    'Yellow',
-    'Green',
-    'Orange',
-    'Purple',
-  ];
-
-  static const Map<String, Color> _colorMap = {
-    'Red': Colors.red,
-    'Yellow': Colors.yellow,
-    'Green': Colors.green,
-    'Orange': Colors.orange,
-    'Purple': Colors.purple,
-  };
+  String _selectedSize = 'all';
+  String _selectedSeeds = 'all';
+  String _selectedBerry = 'all';
 
   @override
   void initState() {
@@ -132,9 +120,20 @@ class _FilterListScreenState extends State<FilterListScreen> {
       _errorMessage = null;
     });
     try {
+      // Convert dropdown string values to the types the API expects
+      bool? hasSeeds;
+      if (_selectedSeeds == 'Has Seeds') hasSeeds = true;
+      if (_selectedSeeds == 'No Seeds') hasSeeds = false;
+
+      bool? isBerry;
+      if (_selectedBerry == 'Berries Only') isBerry = true;
+      if (_selectedBerry == 'No Berries') isBerry = false;
+
       final items = await ProduceApi.fetchProduce(
         category: _selectedCategory,
-        color: _selectedColor,
+        size: _selectedSize,
+        hasSeeds: hasSeeds,
+        isBerry: isBerry,
       );
       setState(() {
         _items = items;
@@ -169,28 +168,48 @@ class _FilterListScreenState extends State<FilterListScreen> {
         children: [
           // ── Filter Bar ────────────────────────────────────────────────
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             color: Colors.grey[100],
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _FilterDropdown<String>(
+                _FilterDropdown(
                   label: 'Category',
                   value: _selectedCategory,
-                  items: _categories,
+                  items: const ['all', 'fruit', 'vegetable'],
                   itemLabel: (c) => c == 'all' ? 'All' : _capitalize(c),
                   onChanged: (val) {
                     setState(() => _selectedCategory = val);
                     _loadProduce();
                   },
                 ),
-                _FilterDropdown<String>(
-                  label: 'Color',
-                  value: _selectedColor,
-                  items: _colors,
-                  itemLabel: (c) => c == 'all' ? 'All' : c,
+                _FilterDropdown(
+                  label: 'Size',
+                  value: _selectedSize,
+                  items: const ['all', 'small', 'medium', 'large'],
+                  itemLabel: (s) => s == 'all' ? 'All' : _capitalize(s),
                   onChanged: (val) {
-                    setState(() => _selectedColor = val);
+                    setState(() => _selectedSize = val);
+                    _loadProduce();
+                  },
+                ),
+                _FilterDropdown(
+                  label: 'Seeds',
+                  value: _selectedSeeds,
+                  items: const ['all', 'Has Seeds', 'No Seeds'],
+                  itemLabel: (s) => s,
+                  onChanged: (val) {
+                    setState(() => _selectedSeeds = val);
+                    _loadProduce();
+                  },
+                ),
+                _FilterDropdown(
+                  label: 'Berry',
+                  value: _selectedBerry,
+                  items: const ['all', 'Berries Only', 'No Berries'],
+                  itemLabel: (s) => s == 'all' ? 'All' : s,
+                  onChanged: (val) {
+                    setState(() => _selectedBerry = val);
                     _loadProduce();
                   },
                 ),
@@ -263,8 +282,7 @@ class _FilterListScreenState extends State<FilterListScreen> {
                   width: 56,
                   height: 56,
                   color: Colors.grey[200],
-                  child: const Icon(Icons.image_not_supported,
-                      color: Colors.grey),
+                  child: const Icon(Icons.image_not_supported, color: Colors.grey),
                 ),
               ),
             ),
@@ -272,15 +290,21 @@ class _FilterListScreenState extends State<FilterListScreen> {
               item.name,
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            subtitle: Text('${_capitalize(item.category)} · ${item.color}'),
-            trailing: Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                color: _colorMap[item.color] ?? Colors.grey,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.black12),
-              ),
+            subtitle: Text('${_capitalize(item.category)} · ${item.size}'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (item.hasSeeds)
+                  const Tooltip(
+                    message: 'Has seeds',
+                    child: Icon(Icons.grain, size: 16, color: Colors.brown),
+                  ),
+                if (item.isBerry)
+                  const Tooltip(
+                    message: 'Berry',
+                    child: Icon(Icons.circle, size: 16, color: Colors.purple),
+                  ),
+              ],
             ),
           ),
         );
@@ -290,12 +314,12 @@ class _FilterListScreenState extends State<FilterListScreen> {
 }
 
 // ─── Reusable filter dropdown ──────────────────────────────────────────────
-class _FilterDropdown<T> extends StatelessWidget {
+class _FilterDropdown extends StatelessWidget {
   final String label;
-  final T value;
-  final List<T> items;
-  final String Function(T) itemLabel;
-  final ValueChanged<T> onChanged;
+  final String value;
+  final List<String> items;
+  final String Function(String) itemLabel;
+  final ValueChanged<String> onChanged;
 
   const _FilterDropdown({
     required this.label,
@@ -310,14 +334,15 @@ class _FilterDropdown<T> extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(fontSize: 11, color: Colors.grey)),
-        DropdownButton<T>(
+        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+        DropdownButton<String>(
           value: value,
+          isDense: true,
           items: items
-              .map((item) => DropdownMenuItem<T>(
+              .map((item) => DropdownMenuItem<String>(
                     value: item,
-                    child: Text(itemLabel(item)),
+                    child: Text(itemLabel(item),
+                        style: const TextStyle(fontSize: 13)),
                   ))
               .toList(),
           onChanged: (val) {
