@@ -3,19 +3,82 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 void main() {
-  runApp(const MyApp()); 
+  runApp(const MyApp());
 }
 
+// ─── Config ────────────────────────────────────────────────────────────────
+// Replace this with your Railway deployment URL once deployed.
+// For local testing use:
+//   Android emulator → 'http://10.0.2.2:8000'
+//   iOS simulator / web → 'http://localhost:8000'
+const String kBaseUrl = 'https://your-app.up.railway.app';
+
+// ─── Model ─────────────────────────────────────────────────────────────────
+class ProduceItem {
+  final int id;
+  final String name;
+  final String category;
+  final String color;
+  final String imageUrl;
+
+  const ProduceItem({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.color,
+    required this.imageUrl,
+  });
+
+  factory ProduceItem.fromJson(Map<String, dynamic> json) {
+    return ProduceItem(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      category: json['category'] as String,
+      color: json['color'] as String,
+      imageUrl: json['image'] as String,
+    );
+  }
+}
+
+// ─── API Service ───────────────────────────────────────────────────────────
+class ProduceApi {
+  static Future<List<ProduceItem>> fetchProduce({
+    String? category,
+    String? color,
+  }) async {
+    final queryParams = <String, String>{};
+    if (category != null && category != 'all') queryParams['category'] = category;
+    if (color != null && color != 'all') queryParams['color'] = color;
+
+    final uri = Uri.parse('$kBaseUrl/produce/filter')
+        .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+
+    final response =
+        await http.get(uri).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final items = body['data'] as List<dynamic>;
+      return items
+          .map((e) => ProduceItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } else {
+      throw Exception('Server error: ${response.statusCode}');
+    }
+  }
+}
+
+// ─── App ───────────────────────────────────────────────────────────────────
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Fruits & Veggies Filter',
+      title: 'Frulter',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.green, 
+        colorSchemeSeed: Colors.green,
         useMaterial3: true,
       ),
       home: const FilterListScreen(),
@@ -23,24 +86,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class FoodItem {
-  final String name;
-  final String category;
-  final String size;  
-  final bool hasSeeds; 
-  final bool isBerry;  
-  final String imageUrl; 
-
-  FoodItem({
-    required this.name,
-    required this.category,
-    required this.size,
-    required this.hasSeeds,
-    required this.isBerry,
-    required this.imageUrl,
-  });
-}
-
+// ─── Screen ────────────────────────────────────────────────────────────────
 class FilterListScreen extends StatefulWidget {
   const FilterListScreen({super.key});
 
@@ -49,193 +95,236 @@ class FilterListScreen extends StatefulWidget {
 }
 
 class _FilterListScreenState extends State<FilterListScreen> {
-  
-  final List<FoodItem> allItems = [
-    FoodItem(
-      name: 'Strawberry',
-      category: 'Fruit',
-      size: 'Small',
-      hasSeeds: true,
-      isBerry: true,
-      imageUrl: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=200',
-    ),
+  List<ProduceItem> _items = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
-    FoodItem(
-      name: 'Watermelon',
-      category: 'Fruit',
-      size: 'Large',
-      hasSeeds: true,
-      isBerry: false,
-      imageUrl: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=200',
-    ),
-    
-    FoodItem(
-      name: 'Carrot',
-      category: 'Vegetable',
-      size: 'Medium',
-      hasSeeds: false,
-      isBerry: false,
-      imageUrl: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=200',
-    ),
+  String _selectedCategory = 'all';
+  String _selectedColor = 'all';
 
-    FoodItem(
-      name: 'Blueberry',
-      category: 'Fruit',
-      size: 'Small',
-      hasSeeds: true,
-      isBerry: true,
-      imageUrl: 'https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?w=200',
-    ),
-
-    FoodItem(
-      name: 'Apple',
-      category: 'Fruit',
-      size: 'Medium',
-      hasSeeds: true,
-      isBerry: false,
-      imageUrl: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=200',
-    ),
-
-    FoodItem(
-      name: 'Mango',
-      category: 'Fruit',
-      size: 'Medium',
-      hasSeeds: true,
-      isBerry: false,
-      imageUrl: 'https://images.unsplash.com/photo-1553279768-865429fa0078?w=200',
-    ),
-
-    FoodItem(
-      name: 'Grapes',
-      category: 'Fruit',
-      size: 'Small',
-      hasSeeds: true,
-      isBerry: true,
-      imageUrl: 'https://images.unsplash.com/photo-1537640538966-79f369143f8f?w=200',
-    ),
-    FoodItem(
-      name: 'Orange',
-      category: 'Fruit',
-      size: 'Medium',
-      hasSeeds: true,
-      isBerry: false,
-      imageUrl: 'https://images.unsplash.com/photo-1547514701-42782101795e?w=200',
-    ),
-    FoodItem(
-      name: 'Banana',
-      category: 'Fruit',
-      size: 'Large',
-      hasSeeds: false,
-      isBerry: true, 
-      imageUrl: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=200',
-    ),
+  static const List<String> _categories = ['all', 'fruit', 'vegetable'];
+  static const List<String> _colors = [
+    'all',
+    'Red',
+    'Yellow',
+    'Green',
+    'Orange',
+    'Purple',
   ];
 
-  // Variables to hold our current filter settings
-  String selectedSizeFilter = 'All'; 
-  String selectedSeedFilter = 'All'; 
-  String selectedBerryFilter = 'All';
+  static const Map<String, Color> _colorMap = {
+    'Red': Colors.red,
+    'Yellow': Colors.yellow,
+    'Green': Colors.green,
+    'Orange': Colors.orange,
+    'Purple': Colors.purple,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProduce();
+  }
+
+  Future<void> _loadProduce() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final items = await ProduceApi.fetchProduce(
+        category: _selectedCategory,
+        color: _selectedColor,
+      );
+      setState(() {
+        _items = items;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _capitalize(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
   @override
   Widget build(BuildContext context) {
-    List<FoodItem> filteredItems = allItems.where((item) {
-      
-      // 1. Filter by Size
-      if (selectedSizeFilter != 'All' && item.size != selectedSizeFilter) {
-        return false;
-      }
-      
-      // 2. Filter by Seeds
-      if (selectedSeedFilter == 'Has Seeds' && !item.hasSeeds) return false;
-      if (selectedSeedFilter == 'No Seeds' && item.hasSeeds) return false;
-      
-      // 3. Filter by Berries
-      if (selectedBerryFilter == 'Berries Only' && !item.isBerry) return false;
-      if (selectedBerryFilter == 'No Berries' && item.isBerry) return false;
-
-      return true;
-    }).toList(); 
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Food Filter'),
+        title: const Text('Frulter'),
         backgroundColor: Colors.green[100],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+            onPressed: _loadProduce,
+          ),
+        ],
       ),
-      
       body: Column(
         children: [
-          //--- FILTER CONTROLS DROP-DOWNS SECTION ---
+          // ── Filter Bar ────────────────────────────────────────────────
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.grey[100],
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround, // Spreads dropdowns evenly
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                // Dropdown 1: Size Filter
-                DropdownButton<String>(
-                  value: selectedSizeFilter,
-                  items: <String>['All', 'Small', 'Medium', 'Large'].map((String value) {
-                    return DropdownMenuItem<String>(value: value, child: Text(value));
-                  }).toList(),
-                  onChanged: (newValue) {
-                    setState(() { selectedSizeFilter = newValue!; });
+                _FilterDropdown<String>(
+                  label: 'Category',
+                  value: _selectedCategory,
+                  items: _categories,
+                  itemLabel: (c) => c == 'all' ? 'All' : _capitalize(c),
+                  onChanged: (val) {
+                    setState(() => _selectedCategory = val);
+                    _loadProduce();
                   },
                 ),
-
-                // Dropdown 2: Seed Filter
-                DropdownButton<String>(
-                  value: selectedSeedFilter,
-                  items: <String>['All', 'Has Seeds', 'No Seeds'].map((String value) {
-                    return DropdownMenuItem<String>(value: value, child: Text(value));
-                  }).toList(),
-                  onChanged: (newValue) {
-                    setState(() { selectedSeedFilter = newValue!; });
-                  },
-                ),
-
-                // Dropdown 3: Berry Filter
-                DropdownButton<String>(
-                  value: selectedBerryFilter,
-                  items: <String>['All', 'Berries Only', 'No Berries'].map((String value) {
-                    return DropdownMenuItem<String>(value: value, child: Text(value));
-                  }).toList(),
-                  onChanged: (newValue) {
-                    setState(() { selectedBerryFilter = newValue!; });
+                _FilterDropdown<String>(
+                  label: 'Color',
+                  value: _selectedColor,
+                  items: _colors,
+                  itemLabel: (c) => c == 'all' ? 'All' : c,
+                  onChanged: (val) {
+                    setState(() => _selectedColor = val);
+                    _loadProduce();
                   },
                 ),
               ],
             ),
           ),
 
-          Expanded(
-            child: filteredItems.isEmpty
-                ? const Center(child: Text('No items match your filters!'))
-                : ListView.builder(
-                    itemCount: filteredItems.length,
-                    itemBuilder: (context, index) {
-                      final item = filteredItems[index];
-                      
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        child: ListTile(
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              item.imageUrl, 
-                              width: 50, 
-                              height: 50, 
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('Category: ${item.category} • Size: ${item.size}'),
-                        ),
-                      );
-                    },
-                  ),
-          ),
+          // ── Body ──────────────────────────────────────────────────────
+          Expanded(child: _buildBody()),
         ],
       ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.wifi_off_rounded, size: 52, color: Colors.grey),
+              const SizedBox(height: 12),
+              const Text(
+                'Could not reach the server',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: _loadProduce,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_items.isEmpty) {
+      return const Center(child: Text('No items match your filters.'));
+    }
+
+    return ListView.builder(
+      itemCount: _items.length,
+      itemBuilder: (context, index) {
+        final item = _items[index];
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          child: ListTile(
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                item.imageUrl,
+                width: 56,
+                height: 56,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 56,
+                  height: 56,
+                  color: Colors.grey[200],
+                  child: const Icon(Icons.image_not_supported,
+                      color: Colors.grey),
+                ),
+              ),
+            ),
+            title: Text(
+              item.name,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text('${_capitalize(item.category)} · ${item.color}'),
+            trailing: Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: _colorMap[item.color] ?? Colors.grey,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.black12),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Reusable filter dropdown ──────────────────────────────────────────────
+class _FilterDropdown<T> extends StatelessWidget {
+  final String label;
+  final T value;
+  final List<T> items;
+  final String Function(T) itemLabel;
+  final ValueChanged<T> onChanged;
+
+  const _FilterDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.itemLabel,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        DropdownButton<T>(
+          value: value,
+          items: items
+              .map((item) => DropdownMenuItem<T>(
+                    value: item,
+                    child: Text(itemLabel(item)),
+                  ))
+              .toList(),
+          onChanged: (val) {
+            if (val != null) onChanged(val);
+          },
+        ),
+      ],
     );
   }
 }
