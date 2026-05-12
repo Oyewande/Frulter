@@ -7,7 +7,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# ── Data 
+# ── Data
 
 produce = [
     {"id": 1,  "name": "Apple",       "category": "fruit",     "color": "Red",    "image": "https://dummyimage.com/300x300/e74c3c/fff&text=Apple"},
@@ -25,7 +25,7 @@ produce = [
 ]
 
 
-# ── Filter 
+# ── Filter
 
 def filter_fruits(data):
     return [item for item in data if item["category"] == "fruit"]
@@ -37,7 +37,7 @@ def filter_by_color(data, color):
     return [item for item in data if item["color"].lower() == color.lower()]
 
 
-# ── Routes 
+# ── Routes
 
 @app.get("/produce", summary="Get all produce")
 def get_all_produce():
